@@ -1,4 +1,5 @@
 include("data_reader.jl")
+using Plots
 
 # calculate sailing time between two ports in currents using BFS
 function calculate_sailing_time(currents, s, t)
@@ -324,7 +325,7 @@ end
 function plot_result(currents, port_positions, orders, path, use_time = true)
     map = deepcopy(currents)
     # color the paths
-    prev_order = orders[prev_order_id]
+    prev_order = orders[path[1]]
     for order_id in path[1:end]
         # map previous port to current port travel at loss (gray)
         order = orders[order_id]
@@ -370,7 +371,7 @@ function plot_result(currents, port_positions, orders, path, use_time = true)
 end
 
 # make the above code into a function
-function find_and_print_best_path(A, res_max, orders, use_time = true)
+function find_and_print_best_path(A, res_max, use_time = true)
     # print best path from all possible paths
     best_cost = 0
     best_path = 0
@@ -394,14 +395,14 @@ function find_and_print_best_path(A, res_max, orders, use_time = true)
     println("The best path $(use_time ? "using time" : "without time")):")
     println(reverse!(path))
     println("With profit: ", best_cost)
-    return plot_result(currents, port_positions, orders, path, use_time)   
+    return path  
 end
 
 function main()
     currents = read_sea_matrix("sea_matrix.txt")
     n_ports, port_name, port_positions = read_ports_data("ports.txt")
 
-    charter_rates, orders = read_order_instance("order_instance2.txt")
+    charter_rates, orders = read_order_instance("order_instance1.txt")
     
     populate_sailing_time(currents, orders, port_positions)
     populate_profit(orders, charter_rates)
@@ -410,11 +411,13 @@ function main()
     use_time = false
     A = labeling_ERCSP(G,length(orders), res_max, orders, use_time)
     hms = []
-    push!(hms, find_and_print_best_path(A, res_max, orders, use_time))
+    path = find_and_print_best_path(A, res_max, use_time)
+    push!(hms, plot_result(currents, port_positions, orders, path, use_time))
     println("----------------------------------------")
     use_time = true
     A = labeling_ERCSP(G,length(orders), res_max, orders, use_time)
-    push!(hms, find_and_print_best_path(A, res_max, orders, use_time))
+    path = find_and_print_best_path(A, res_max, use_time)
+    push!(hms, plot_result(currents, port_positions, orders, path, use_time))
     plot(hms..., layout=(1,2), size=(1000,500))
 end
 main()
