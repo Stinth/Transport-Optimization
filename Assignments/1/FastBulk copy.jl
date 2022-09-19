@@ -268,6 +268,32 @@ function labeling_ERCSP(G,source, res_max)
     return Λ
 end
 
+# make the above code into a function
+function find_and_print_best_path(A, res_max)
+    # print best path from all possible paths
+    best_cost = 0
+    best_path = 0
+    for (i, node) in enumerate(A)
+        for path in node
+            if all(path.res_usage .<= [res_max])
+                if path.cost > best_cost
+                    best_cost = path.cost
+                    best_path = path
+                end
+            end
+        end
+    end
+    # unravel path
+    path = []
+    while !isequal(best_path, missing)
+        push!(path, best_path.vertex)
+        best_path = best_path.prev
+    end
+    
+    println("The best path is")
+    println(reverse(path))
+    println("With profit: ", best_cost)    
+end
 
 function main()
     currents = read_sea_matrix("sea_matrix.txt")
@@ -278,54 +304,20 @@ function main()
     populate_sailing_time(currents, orders, port_positions)
     populate_profit(orders, charter_rates)
     G, res_max = create_graph(n_ports, port_positions, 60, currents, orders)
-    A = labeling_ERCSP(G,21, res_max)
+    A = labeling_ERCSP(G,length(orders), res_max)
+    find_and_print_best_path(A, res_max)
 end
+main()
+# currents = read_sea_matrix("sea_matrix.txt")
+# n_ports, port_name, port_positions = read_ports_data("ports.txt")
 
-currents = read_sea_matrix("sea_matrix.txt")
-n_ports, port_name, port_positions = read_ports_data("ports.txt")
+# charter_rates, orders = read_order_instance("order_instance3.txt")
 
-charter_rates, orders = read_order_instance("order_instance1.txt")
-
-populate_sailing_time(currents, orders, port_positions)
-populate_profit(orders, charter_rates)
-G, res_max = create_graph(n_ports, port_positions, 60, currents, orders)
-A = labeling_ERCSP(G,21, res_max)
+# populate_sailing_time(currents, orders, port_positions)
+# populate_profit(orders, charter_rates)
+# G, res_max = create_graph(n_ports, port_positions, 60, currents, orders)
+# A = labeling_ERCSP(G,length(orders), res_max)
 
 
-for (i, node) in enumerate(A)
-    counter = 0
-    for path in node
-        if all(path.res_usage .<= [res_max])
-            counter += 1
-        end
-    end
-    println(i, " ", counter)
-end
-println("--------------------")
-# print best path
-for (i, node) in enumerate(A)
-    best = 0
-    for path in node
-        if all(path.res_usage .<= [res_max])
-            if path.cost > best
-                best = path.cost
-            end
-        end
-    end
-    println(i, " ", best)
-end
 
-# print best path from all possible paths
-best_cost = 0
-for (i, node) in enumerate(A)
-    for path in node
-        if all(path.res_usage .<= [res_max])
-            if path.cost > best_cost
-                best_cost = path.cost
-                best_path = path
-            end
-        end
-    end
-end
-println(i, " ", best_cost)
-println(best_path)
+# find_and_print_best_path(A, res_max)
