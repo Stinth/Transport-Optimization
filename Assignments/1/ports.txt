@@ -1,0 +1,12 @@
+Bari    9   30
+Trieste 2   24
+Genova  4   19
+Gioia_Tauro 12  27
+Marseille   6   16
+Barcellona  7   12
+Valencia    10  8
+Algeciras   13  2
+Pireus  11  37
+Patras  11  32
+Limassol    16  48
+La_Spezia   5   21
