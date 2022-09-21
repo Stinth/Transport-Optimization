@@ -32,5 +32,6 @@ function main()
 
     charter_rates, orders = read_order_instance("order_instance1.txt")
     plot_map(currents, port_positions, orders)
+    savefig("port_plot.png")
 end
 main()

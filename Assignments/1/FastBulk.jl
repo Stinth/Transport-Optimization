@@ -401,10 +401,11 @@ function find_and_print_best_path(A, res_max, use_time = true)
 end
 
 function main()
+    filename = "order_instance3"
     currents = read_sea_matrix("sea_matrix.txt")
     n_ports, port_name, port_positions = read_ports_data("ports.txt")
 
-    charter_rates, orders = read_order_instance("order_instance1.txt")
+    charter_rates, orders = read_order_instance(filename * ".txt")
     
     populate_sailing_time(currents, orders, port_positions)
     populate_profit(orders, charter_rates)
@@ -421,6 +422,7 @@ function main()
     path = find_and_print_best_path(A, res_max, use_time)
     push!(hms, plot_result(currents, port_positions, orders, path, use_time))
     plot(hms..., layout=(1,2), size=(1000,500))
+    savefig("route_plot_$(filename).png")
 end
 main()
 # currents = read_sea_matrix("sea_matrix.txt")
