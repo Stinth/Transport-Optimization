@@ -386,6 +386,7 @@ function find_and_print_best_path(A, res_max, use_time = true)
         end
     end
     # unravel path
+    fuel_consumption = best_path.res_usage[1]
     path = []
     while !isequal(best_path, missing)
         push!(path, best_path.vertex)
@@ -395,6 +396,7 @@ function find_and_print_best_path(A, res_max, use_time = true)
     println("The best path $(use_time ? "using time" : "without time")):")
     println(reverse!(path))
     println("With profit: ", best_cost)
+    println("Fuel consumption: ", fuel_consumption)
     return path  
 end
 
