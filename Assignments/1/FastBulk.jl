@@ -88,7 +88,7 @@ function create_graph(n_ports, port_positions, res_high, currents, orders)
                 push!(adj[i], Edge(
                     i, 
                     j,
-                    order_a.profit + order_b.profit -sailing_time * BUNKER_COST, 
+                    order_b.profit -sailing_time * BUNKER_COST, # if order_a.profit is omitted the total profit increases
                     [order_b.sailing_time + sailing_time, sailing_time*2.5 + order_b.service_time])) # from, to, cost, res_usage (currently bunker usage)
             end
         end
@@ -360,18 +360,18 @@ function plot_result(currents, port_positions, orders, path, use_time = true)
     map[port_positions[order.origin_port,1], port_positions[order.origin_port,2]] = 6
     map[port_positions[order.destination_port,1], port_positions[order.destination_port,2]] = 5
     # plot the map
-    return heatmap(map,
-                c=cgrad(
-                    [:green, :blue, :gray, :lightgreen, :white, :red, :orange], categorical=true),
-                yflip=true,
-                axis=nothing,
-                legend=:none,
-                title = "Best route $(use_time ? "using time" : "without time")")
+    heatmap(map,
+        c=cgrad(
+            [:green, :blue, :gray, :lightgreen, :white, :red, :orange], categorical=true),
+        yflip=true,
+        axis=nothing,
+        legend=:none)#,
+        #title = "Best route $(use_time ? "using time" : "without time")")
 
 end
 
 # make the above code into a function
-function find_and_print_best_path(A, res_max, use_time = true)
+function find_and_print_best_path(A, res_max, orders, port_positions, currents, use_time = true)
     # print best path from all possible paths
     best_cost = 0
     best_path = 0
@@ -395,13 +395,26 @@ function find_and_print_best_path(A, res_max, use_time = true)
     
     println("The best path $(use_time ? "using time" : "without time")):")
     println(reverse!(path))
-    println("With profit: ", best_cost)
-    println("Fuel consumption: ", fuel_consumption)
+    println("With graph profit: ", best_cost)
+    BUNKER_COST = 750
+    prev_order = orders[path[1]]
+    loss_path_length = 0
+    for order_id in path[1:end]
+        # map previous port to current port travel at loss (gray)
+        order = orders[order_id]
+        s = port_positions[prev_order.destination_port,:]
+        t = port_positions[order.origin_port,:]
+        bfs_path = get_path(currents, s, t)
+        loss_path_length += length(bfs_path[2:end])
+        prev_order = order
+    end
+    println("With real profit: ", sum(orders[i].profit for i in path) - loss_path_length*BUNKER_COST)
+    println("With fuel consumption: ", fuel_consumption)
     return path  
 end
 
 function main()
-    filename = "order_instance3"
+    filename = "order_instance1"
     currents = read_sea_matrix("sea_matrix.txt")
     n_ports, port_name, port_positions = read_ports_data("ports.txt")
 
@@ -414,15 +427,19 @@ function main()
     use_time = false
     A = labeling_ERCSP(G,length(orders), res_max, orders, use_time)
     hms = []
-    path = find_and_print_best_path(A, res_max, use_time)
-    push!(hms, plot_result(currents, port_positions, orders, path, use_time))
+    path = find_and_print_best_path(A, res_max, orders, port_positions, currents, use_time)
+    # push!(hms, plot_result(currents, port_positions, orders, path, use_time))
+    plot_result(currents, port_positions, orders, path, use_time)
+    savefig("route_plot_notime_$(filename).png")
     println("----------------------------------------")
     use_time = true
     A = labeling_ERCSP(G,length(orders), res_max, orders, use_time)
-    path = find_and_print_best_path(A, res_max, use_time)
-    push!(hms, plot_result(currents, port_positions, orders, path, use_time))
-    plot(hms..., layout=(1,2), size=(1000,500))
-    savefig("route_plot_$(filename).png")
+    path = find_and_print_best_path(A, res_max, orders, port_positions, currents, use_time)
+    plot_result(currents, port_positions, orders, path, use_time)
+    savefig("route_plot_time_$(filename).png")
+    # push!(hms, plot_result(currents, port_positions, orders, path, use_time))
+    # plot(hms..., layout=(1,2), size=(500,250))
+    # savefig("route_plot_$(filename).png")
 end
 main()
 # currents = read_sea_matrix("sea_matrix.txt")
@@ -442,6 +459,7 @@ main()
 # A = labeling_ERCSP(G,length(orders), res_max, orders, use_time)
 # find_and_print_best_path(A, res_max, use_time)
 # get fastest route between two ports in currents using BFS
+
 
 
 
