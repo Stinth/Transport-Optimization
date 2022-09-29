@@ -21,8 +21,7 @@ function plot_map(currents, port_positions, orders)
                     [:green, :blue, :orange, :white], categorical=true),
                 yflip=true,
                 axis=nothing,
-                legend=:none,
-                title = "All ports (white is inital port)")
+                legend=:none)
 # , :white, :red, :orange
 end
 
