@@ -42,6 +42,7 @@ function plot_solution(x_, y_, q_, travel, station_positions, station_id, distan
     h = 805
     # plot image
     plot(img, xlims = (0, w), ylims = (0, h), axis=([], false), size=(w, h))
+    gr(legendfontsize=15)
     # plot bike connections
     for (i, start) in enumerate(map_nodes)
         for (j, stop) in enumerate(map_nodes)
@@ -67,17 +68,6 @@ function plot_solution(x_, y_, q_, travel, station_positions, station_id, distan
             end
         end
     end
-
-    # #plot bike connecitons arrow
-    # for (i, start) in enumerate(map_nodes)
-    #     for (j, stop) in enumerate(map_nodes)
-    #         if y_[i, j] == 1
-    #             d = 1#(distances[i,j] / maximum(distances)) * 0.15 + 0.85
-    #             arrow0!(start[1], start[2], (stop[1]-start[1])*d, (stop[2]-start[2])*d, as=0.08, width=5, lc=:dodgerblue, la=5)
-    #             # plot!([start[1],stop[1]], [start[2],stop[2]], color=:dodgerblue , linewidth=3) #dodgerblue
-    #         end
-    #     end
-    # end
     # plot bike connections
     for (i, start) in enumerate(map_nodes)
         for (j, stop) in enumerate(map_nodes)
@@ -103,22 +93,6 @@ function plot_solution(x_, y_, q_, travel, station_positions, station_id, distan
             end
         end
     end
-    # for (i, start) in enumerate(map_nodes)
-    #     for (j, stop) in enumerate(map_nodes)
-    #         if i > j 
-    #             if y_[i, j] == 1 && y_[j, i] == 1
-    #                 # create outline for both directions
-    #                 arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=7, lc=:black, la=5)
-    #                 # arrow0!(start[2], start[1], (stop[2]-start[2]), (stop[1]-start[1]), as=0.08, width=7, lc=:black, la=5)
-
-    #                 # create arrow for both directions
-    #                 arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=5, lc=:dodgerblue, la=5)
-    #                 # arrow0!(start[2], start[1], (stop[2]-start[2]), (stop[1]-start[1]), as=0.08, width=5, lc=:dodgerblue, la=5)
-
-    #             end
-    #         end
-    #     end
-    # end
     # plot bus connections arrow
     for (i, start) in enumerate(map_nodes)
         for (j, stop) in enumerate(map_nodes)
@@ -150,13 +124,20 @@ function plot_solution(x_, y_, q_, travel, station_positions, station_id, distan
     for ((x,y),id) in zip(map_nodes, station_id)
         annotate!(x, y, text(id, :black, 12))
     end
-    
-    annotate!(30,40, text("Budget: $(budget)", :black, 22, :left))
-    annotate!(30,95, text("Cost: $(sum(x_ .* distances))", :black, 22, :left))
-    annotate!(30,150, text("Objective: $(objective_value)", :black, 22, :left))
 
+    rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
+
+    # plot(0:5,0:5) 15
+    plot!(rectangle(300,95,20,26), color=:white, label="")
+    
+    annotate!(30,46, text("Budget: $(budget)", :black, 15, :left))
+    # annotate!(30,62, text("Budget: $(budget)", :black, 15, :left))
+    # annotate!(30,89, text("Budget: $(budget)", :black, 15, :left))
+    annotate!(30,71, text("Cost: $(Int(round(sum(x_ .* distances), digits=0)))", :black, 15, :left))
+    annotate!(30,96, text("Objective: $(round(objective_value, digits=0))", :black, 15, :left))
+    
     plot!([0, 0], [0, 0], color=:gold1, linewidth=0, label="Bus Connection")
-    plot!([0, 0], [0, 0], color=:dodgerblue, linewidth=0, label="Bike Last Leg")
+    plot!([0, 0], [0, 0], color=:dodgerblue, linewidth=0, label="Bike First/Last Leg")
     plot!([0, 0], [0, 0], color=:turquoise, linewidth=0, label="Bike Direct")
     plot!()
     savefig("part1_budget_$(budget).png")

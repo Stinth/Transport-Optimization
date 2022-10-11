@@ -26,7 +26,7 @@ connections = Bool.(sheet["B23:R39"])
 OD = sheet["B47:R63"]
 
 
-budget = 500
+budget = 1500
 
 # distance matrix between all station_positions
 distances = zeros(size(station_positions, 1), size(station_positions, 1))
@@ -66,10 +66,10 @@ model = Model(Gurobi.Optimizer)
 
 # minimize the total user inconvenience; distance traveled by bike and distance traveled by bus
 # bus travels twice as fast as bike
-@objective(model, Min, 
-    sum((OD[i,j] .* distances[k,l]/bus_speed .* x[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* y[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* q[k,l]) .* z[i,j,k,l] for i in 1:N, j in 1:N, k in 1:N, l in 1:N))
 # @objective(model, Min, 
-#     sum((distance_cost[k,l] .* x[k,l]/bus_speed + distance_cost[k,l] .* y[k,l]/bike_speed) .* z[i,j,k,l] for i in 1:N, j in 1:N, k in 1:N, l in 1:N))
+#     sum((OD[i,j] .* distances[k,l]/bus_speed .* x[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* y[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* q[k,l]) .* z[i,j,k,l] for i in 1:N, j in 1:N, k in 1:N, l in 1:N))
+@objective(model, Min, 
+    sum(sum((distances/bus_speed .* x + distances/bike_speed .* y + distances/bike_speed .* q) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
 
 # crazy constraint fixes everything, thank you
 # demand -1 at origin, demand +1 at destination, 0 in between
@@ -114,7 +114,7 @@ if termination_status(model) == MOI.OPTIMAL
     println("Objective value: $(objective_value(model))")
     # show enabled bus connections
     println("-------------------------------------")
-    println("--Enabled bus connections:")
+    println("-- Enabled bus connections:")
     for (i, start) in enumerate(eachrow(station_positions))
         for (j, stop) in enumerate(eachrow(station_positions))
             if value(x[i, j]) == 1
@@ -125,10 +125,20 @@ if termination_status(model) == MOI.OPTIMAL
     end
     # show enabled bike connections
     println("-------------------------------------")
-    println("--Enabled bike connections:")
+    println("-- Enabled bike connections:")
     for (i, start) in enumerate(eachrow(station_positions))
         for (j, stop) in enumerate(eachrow(station_positions))
             if value(y[i, j]) == 1
+                printfmt("{:s} to {:s} || ID: {:d} to {:d} || distance: {:1.0f}\n", station_names[i], station_names[j], i, j, distances[i, j])
+            end
+        end
+    end
+    # show enabled direct bike connections
+    println("-------------------------------------")
+    println("-- Enabled direct bike connections:")
+    for (i, start) in enumerate(eachrow(station_positions))
+        for (j, stop) in enumerate(eachrow(station_positions))
+            if value(q[i, j]) == 1
                 printfmt("{:s} to {:s} || ID: {:d} to {:d} || distance: {:1.0f}\n", station_names[i], station_names[j], i, j, distances[i, j])
             end
         end
@@ -154,19 +164,19 @@ function find_path(z,origin,destination)
     end
     print(path)
 end
-
+z_= value.(z)
 # path_find(z, 12, 15)
-
-x_cost = sum(value.(x) .* (distance_cost/bus_speed) .* travel)
-y_cost = sum(value.(y) .* distance_cost/bike_speed .* travel)
-q_cost = sum(value.(q) .* distance_cost/bike_speed .* travel)
+# sum(sum((OD[i,j] .* distances/bus_speed .* value.(x) + OD[i,j] .* distances/bike_speed .* value.(y) + OD[i,j] .* distances/bike_speed .* value.(q)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
+x_obj = sum(sum((OD[i,j] .* distances/bus_speed .* value.(x)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
+y_obj = sum(sum((OD[i,j] .* distances/bike_speed .* value.(y)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
+q_obj = sum(sum((OD[i,j] .* distances/bike_speed .* value.(q)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
 # show objective contribution
 println("-------------------------------------")
 println("Objective contribution:")
-println("Bus: $(x_cost)")
-println("Bike: $(y_cost)")
-println("Direct bike: $(q_cost)")
-println("Total: $(x_cost + y_cost + q_cost)")
+println("Bus: $(x_obj)")
+println("Bike: $(y_obj)")
+println("Direct bike: $(q_obj)")
+println("Total: $(x_obj + y_obj + q_obj)")
 println("objective_value: $(objective_value(model))")
 
 
