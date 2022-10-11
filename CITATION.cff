@@ -1,3 +1,6 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
 cff-version: 1.2.0
 title: 42117 Transport Optimization
 message: >-
@@ -5,19 +8,12 @@ message: >-
   respective directories.
 type: software
 authors:
-  - family-names: Jelstrup
-    name-particle: Malthe
+  - given-names: Malthe Jelstrup
     email: s184291@dtu.dk
     affiliation: DTU
   - given-names: Vera Nijmeijer
     email: s213011@dtu.dk
     affiliation: DTU
-identifiers:
-  - type: url
-    value: >-
-      https://github.com/Stinth/Transport-Optimization/tree/master/Assignments/2-ODTMS
-    description: Github repository
-  - type: url
-    value: >-
-      https://github.com/Stinth/Transport-Optimization/tree/ee5fed30d06a0b0e6f9555494031c3150e1cfe8a/Assignments/2-ODTMS
-    description: Commit
+repository: >-
+  https://github.com/Stinth/Transport-Optimization/tree/master/Assignments/2-ODTMS
+commit: ee5fed30d06a0b0e6f9555494031c3150e1cfe8a
