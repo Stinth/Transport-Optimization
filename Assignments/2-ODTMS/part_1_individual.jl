@@ -66,18 +66,6 @@ model = Model(Gurobi.Optimizer)
 
 
 # minimize the total user inconvenience; distance traveled by bike and distance traveled by bus
-# bus travels twice as fast as bike
-# @objective(model, Min, 
-#     sum((OD[i,j] .* distances[k,l]/bus_speed .* x[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* y[k,l] + OD[i,j] .* distances[k,l]/bike_speed .* q[k,l]) .* z[i,j,k,l] for i in 1:N, j in 1:N, k in 1:N, l in 1:N))
-# @objective(model, Min, 
-#     sum(sum((distances/bus_speed .* x + distances/bike_speed .* y + distances/bike_speed .* q) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
-
-# @objective(model, Min, 
-#     sum(sum((distances/bus_speed .* x) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
-#     sum(sum((distances/bike_speed .* y[i,j,:,:]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
-#     sum(sum((distances/bike_speed .* q[i,j]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
-
-
 @objective(model, Min, 
     sum(sum((distances/bus_speed .* x + distances/bike_speed .* y[i,j,:,:] + distances/bike_speed .* q[i,j]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
 
@@ -86,38 +74,12 @@ model = Model(Gurobi.Optimizer)
 
 # crazy constraint fixes everything, thank you
 # demand -1 at origin, demand +1 at destination, 0 in between
-# balance constraint, what comes into a stop has to go out again (unless origin/destination)
-# @constraint(model, [i=1:N,j=1:N,k=1:N],
-#             sum(z[i,j,k,l] * (x[k,l]+
-#             ((bike_connections[k,l] && (i==k || j==l)) ? y[k,l] : 0) +
-#             ((i==k && j==l) ? q[k,l] : 0)) for l=1:N) + (i==k ? -1 : 0) + (j==k ? 1 : 0) == 
-#             sum(z[i,j,l,k] * (x[l,k] +
-#             ((bike_connections[l,k] && (i==l || j==k)) ? y[l,k] : 0) +
-#             (i==l && j==k ? q[l,k] : 0)) for l=1:N))
-
-
-# THIS IS THE PREVIOUS ONE
-# @constraint(model, [i=1:N, j=1:N, k=1:N], # && ((i==k) ⊻ (j==l)) //// sum(z[i,j,:,:])
-#             sum(z[i,j,k,l] * (x[k,l] + ((((i == k) ⊻ (j == l))) ? y[k,l] : 0) + ((i==k && j==l) ? q[k,l] : 0)) for l=1:N) + (i==k ? -1 : 0) + (j==k ? 1 : 0) == 
-#             sum(z[i,j,l,k] * (x[l,k] + ((((i == l) ⊻ (j == k))) ? y[l,k] : 0) + q[l,k]) for l=1:N))
-
-
 @constraint(model, [i=1:N,j=1:N,k=1:N], sum(z[i,j,k,l] for l=1:N) + (i==k ? -1 : 0) + (j==k ? 1 : 0) == sum(z[i,j,l,k] for l=1:N)) 
-#  && ((i==l) ⊻ (j==k))
-# ((i==l && j==k) ? q[l,k] : 0)
-# THIS HERE ---- (((i == k) && !(j == l)) || (!(i == k) && (j == l) && !(bike_connections[i,k])))
-# set z value to 1 if connection is used    &&             ⊻ (j == l                                                   4    2     3    3
 
-# @constraint(model, [i=1:N,j=1:N,k=1:N,l=1:N], z[i,j,k,l] <= x[k,l] + (i == k && j == l ? q[k,l] : 0) + (((i == k) ⊻ (j == l)) ? y[k,l] : 0))
 @constraint(model , [i=1:N,j=1:N,k=1:N,l=1:N], z[i,j,k,l] <= x[k,l] +
                                     (i == k && j == l ? q[k,l] : 0) +
                                     ((bike_connections[i,l] && k == i && l != j) ? y[i,j,k,l] : 0) + # && !(bike_connections[l,j])
                                     ((bike_connections[k,j] && j == l && i != k) ? y[i,j,k,l] : 0)) # && !(bike_connections[i,k])
-
-
-
-# this constraint means if y is part of the path, x must be part of it as well in some way
-# @constraint(model, [i=1:N,j=1:N], sum(z[i,j,k,l] * y[k,l] for k=1:N, l=1:N) +1 <= sum(z[i,j,k,l] for k=1:N, l=1:N))
  
 # budget constraint can get optimal of 0 with budget of 800
 @constraint(model, sum(x .* distances) <= budget)
@@ -137,12 +99,6 @@ model = Model(Gurobi.Optimizer)
 # y can only link to a node if q does not link to that node
 @constraint(model, [i=1:N, j=1:N], sum(y[i,j,i,k] for k in 1:N) + q[i,j]  <= 1)
 @constraint(model, [i=1:N, j=1:N], sum(y[i,j,k,j] for k in 1:N) + q[i,j]  <= 1)
-
-
-# a path can only be used for either bike or bus
-# @constraint(model, x + y .<= 1)
-# @constraint(model, x + q .<= 1)
-
 
 optimize!(model)
 println("Termination status: $(termination_status(model))")
@@ -209,8 +165,6 @@ function find_path(z,origin,destination)
     print(path)
 end
 z_= value.(z)
-# path_find(z, 12, 15)
-# sum(sum((OD[i,j] .* distances/bus_speed .* value.(x) + OD[i,j] .* distances/bike_speed .* value.(y) + OD[i,j] .* distances/bike_speed .* value.(q)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
 x_obj = sum(sum((OD[i,j] .* distances/bus_speed .* round.(value.(x))) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
 y_obj = sum(sum((OD[i,j] .* distances/bike_speed .* round.(binary_y)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
 q_obj = sum(sum((OD[i,j] .* distances/bike_speed .* value.(q)) .* z_[i,j,:,:] for i in 1:N, j in 1:N))
@@ -228,12 +182,6 @@ println("number of bike connections: $(sum(value.(binary_y.*binary_travel)))")
 println("number of direct bike connections: $(sum(value.(q.*binary_travel)))")
 
 
-
-# @objective(model, Min, 
-#     sum((distance_cost[k,l]/bus_speed .* x[k,l] + distance_cost[k,l]/bike_speed .* y[k,l] + distance_cost[k,l]/bike_speed .* q[k,l]) .* z[i,j,k,l] for i in 1:N, j in 1:N, k in 1:N, l in 1:N))
-
-
-# (distance_cost[3,4] + distance_cost[4,2]) * OD[3,2] - distance_cost[3,2] * OD[3,2]
 
 # for i in 1:N
 #     for j in 1:N
