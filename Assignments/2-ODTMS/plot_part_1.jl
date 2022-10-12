@@ -5,6 +5,7 @@ using Images
 # arrow0!(map_nodes[2][1], map_nodes[2][2],(map_nodes[1][1]-map_nodes[2][1])*0.98,(map_nodes[1][2]-map_nodes[2][2])*0.98, as=0.07, width=4, lc=:red, la=5)
 # arrow0!(map_nodes[1][1], map_nodes[1][2],(map_nodes[2][1]-map_nodes[1][1])*0.98,(map_nodes[2][2]-map_nodes[1][2])*0.98, as=0.07, width=4, lc=:red, la=5)
 function plot_solution(x_, y_, q_, travel, station_positions, station_id, distances, budget, objective_value)
+    x_, y_, q_, travel = round.(x_), round.(y_), round.(q_), round.(travel)
     function arrow0!(x, y, u, v; as=0.07, width=3, lc=:red, la=5)  # by @rafael.guerra
         if as < 0
             quiver!([x],[y],quiver=([u],[v]), lc=lc, la=la)  # NB: better use quiver directly in vectorial mode
