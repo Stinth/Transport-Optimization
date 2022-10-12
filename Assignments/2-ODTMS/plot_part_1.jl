@@ -4,8 +4,8 @@ using Images
 
 # arrow0!(map_nodes[2][1], map_nodes[2][2],(map_nodes[1][1]-map_nodes[2][1])*0.98,(map_nodes[1][2]-map_nodes[2][2])*0.98, as=0.07, width=4, lc=:red, la=5)
 # arrow0!(map_nodes[1][1], map_nodes[1][2],(map_nodes[2][1]-map_nodes[1][1])*0.98,(map_nodes[2][2]-map_nodes[1][2])*0.98, as=0.07, width=4, lc=:red, la=5)
-function plot_solution(x_, y_, q_, travel, station_positions, station_id, distances, budget, objective_value)
-    x_, y_, q_, travel = round.(x_), round.(y_), round.(q_), round.(travel)
+function plot_solution(x_, y_, q_, z_, travel, station_positions, station_id, distances, budget, objective_value)
+    x_, y_, q_, travel, z_ =  round.(x_), round.(y_), round.(q_), round.(travel), round.(z_)
     function arrow0!(x, y, u, v; as=0.07, width=3, lc=:red, la=5)  # by @rafael.guerra
         if as < 0
             quiver!([x],[y],quiver=([u],[v]), lc=lc, la=la)  # NB: better use quiver directly in vectorial mode
@@ -70,25 +70,31 @@ function plot_solution(x_, y_, q_, travel, station_positions, station_id, distan
         end
     end
     # plot bike connections
-    for (i, start) in enumerate(map_nodes)
-        for (j, stop) in enumerate(map_nodes)
-            if i > j 
-                if (y_[i, j] == 1 && travel[i, j] > 0) || (y_[j, i] == 1 && travel[j, i] > 0)
-                    # create outline for both directions
-                    if y_[i, j] == 1
-                        arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=7, lc=:black, la=5)
-                    end
-                    if y_[j, i] == 1
-                        arrow0!(stop[1], stop[2], (start[1]-stop[1]), (start[2]-stop[2]), as=0.08, width=7, lc=:black, la=5)
-                    end
-                    
+    for k in 1:17
+        for l in 1:17
+            for (i, start) in enumerate(map_nodes)
+                for (j, stop) in enumerate(map_nodes)
+                    if i > j 
+                        temp_y = y_[k, l, :, :]
+                        temp_z = z_[k, l, :, :]
+                        if (temp_y[i, j] == 1 && temp_z[i, j] > 0) || (temp_y[j, i] == 1 && temp_z[j, i] > 0)
+                            # create outline for both directions
+                            if temp_y[i, j] == 1
+                                arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=7, lc=:black, la=5)
+                            end
+                            if temp_y[j, i] == 1
+                                arrow0!(stop[1], stop[2], (start[1]-stop[1]), (start[2]-stop[2]), as=0.08, width=7, lc=:black, la=5)
+                            end
+                            
 
-                    # create arrow for both directions
-                    if y_[i, j] == 1
-                        arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=5, lc=:dodgerblue, la=5)
-                    end
-                    if y_[j, i] == 1
-                        arrow0!(stop[1], stop[2], (start[1]-stop[1]), (start[2]-stop[2]), as=0.08, width=5, lc=:dodgerblue, la=5)
+                            # create arrow for both directions
+                            if temp_y[i, j] == 1
+                                arrow0!(start[1], start[2], (stop[1]-start[1]), (stop[2]-start[2]), as=0.08, width=5, lc=:dodgerblue, la=5)
+                            end
+                            if temp_y[j, i] == 1
+                                arrow0!(stop[1], stop[2], (start[1]-stop[1]), (start[2]-stop[2]), as=0.08, width=5, lc=:dodgerblue, la=5)
+                            end
+                        end
                     end
                 end
             end
