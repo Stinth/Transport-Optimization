@@ -26,7 +26,7 @@ connections = Bool.(sheet["B23:R39"])
 OD = sheet["B47:R63"]
 
 
-budget = 1800
+budget = 3300
 
 # distance matrix between all station_positions
 distances = zeros(size(station_positions, 1), size(station_positions, 1))
@@ -72,10 +72,17 @@ model = Model(Gurobi.Optimizer)
 # @objective(model, Min, 
 #     sum(sum((distances/bus_speed .* x + distances/bike_speed .* y + distances/bike_speed .* q) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
 
+# @objective(model, Min, 
+#     sum(sum((distances/bus_speed .* x) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
+#     sum(sum((distances/bike_speed .* y[i,j,:,:]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
+#     sum(sum((distances/bike_speed .* q[i,j]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
+
+
 @objective(model, Min, 
-    sum(sum((distances/bus_speed .* x) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
-    sum(sum((distances/bike_speed .* y[i,j,:,:]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)) +
-    sum(sum((distances/bike_speed .* q[i,j]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
+    sum(sum((distances/bus_speed .* x + distances/bike_speed .* y[i,j,:,:] + distances/bike_speed .* q[i,j]) .* z[i,j,:,:] * OD[i,j] for i in 1:N, j in 1:N)))
+
+
+
 
 # crazy constraint fixes everything, thank you
 # demand -1 at origin, demand +1 at destination, 0 in between
@@ -119,7 +126,7 @@ model = Model(Gurobi.Optimizer)
 # a path can only be used if it is enabled
 @constraint(model, x .<= connections)
 @constraint(model, [i=1:N, j=1:N], y[i,j,:,:] .<= bike_connections)
-@constraint(model, q .<= 1)
+# @constraint(model, q .<= 1)
 @constraint(model, [i=1:N], x[i,i] + q[i,i] == 0)
 @constraint(model, [i=1:N], z[i,i,:,:] .+ y[i,i,:,:] .== 0)
 
