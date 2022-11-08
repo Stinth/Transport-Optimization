@@ -1,0 +1,110 @@
+using JuMP
+import GLPK
+import SparseArrays
+
+struct Piece
+    w::Float64
+    d::Int
+end
+
+struct Data
+    pieces::Vector{Piece}
+    W::Float64
+end
+
+function Base.show(io::IO, d::Data)
+    println(io, "Data for the cutting stock problem:")
+    println(io, "  W = $(d.W)")
+    println(io, "with pieces:")
+    println(io, "   i   w_i d_i")
+    println(io, "  ------------")
+    for (i, p) in enumerate(d.pieces)
+        println(io, lpad(i, 4), " ", lpad(p.w, 5), " ", lpad(p.d, 3))
+    end
+    return
+end
+
+function get_data()
+    data = [
+        75.0 38
+        75.0 44
+        75.0 30
+        75.0 41
+        75.0 36
+        53.8 33
+        53.0 36
+        51.0 41
+        50.2 35
+        32.2 37
+        30.8 44
+        29.8 49
+        20.1 37
+        16.2 36
+        14.5 42
+        11.0 33
+        8.6 47
+        8.2 35
+        6.6 49
+        5.1 42
+    ]
+    return Data([Piece(data[i, 1], data[i, 2]) for i in 1:size(data, 1)], 100.0)
+end
+
+data = get_data()
+I = length(data.pieces)
+
+function solve_pricing(data::Data, π::Vector{Float64})
+    I = length(π)
+    model = Model(GLPK.Optimizer)
+    set_silent(model)
+    @variable(model, y[1:I] >= 0, Int)
+    @constraint(model, sum(data.pieces[i].w * y[i] for i in 1:I) <= data.W)
+    @objective(model, Max, sum(π[i] * y[i] for i in 1:I))
+    optimize!(model)
+    if objective_value(model) > 1
+        return round.(Int, value.(y))
+    end
+    return nothing
+end
+
+patterns = Vector{Int}[]
+for i in 1:I
+    pattern = zeros(Int, I)
+    pattern[i] = floor(Int, min(data.W / data.pieces[i].w, data.pieces[i].d))
+    push!(patterns, pattern)
+end
+P = length(patterns[1])
+
+SparseArrays.sparse(hcat(patterns...))
+
+model = Model(GLPK.Optimizer)
+set_silent(model)
+@variable(model, x[1:P] >= 0)
+@objective(model, Min, sum(x))
+@constraint(model, demand[i = 1:I], patterns[i]' * x == data.pieces[i].d)
+model
+
+while true
+    # Solve the linear relaxation
+    optimize!(model)
+    # Obtain a new dual vector
+    π = dual.(demand)
+    # Solve the pricing problem
+    new_pattern = solve_pricing(data, π)
+    # Stop iterating if there is no new pattern
+    if new_pattern === nothing
+        break
+    end
+    push!(patterns, new_pattern)
+    # Create a new column
+    push!(x, @variable(model, lower_bound = 0))
+    # Update the objective coefficients
+    set_objective_coefficient(model, x[end], 1.0)
+    # Update the non-zeros in the coefficient matrix
+    for i in 1:I
+        if new_pattern[i] > 0
+            set_normalized_coefficient(demand[i], x[end], new_pattern[i])
+        end
+    end
+end
+SparseArrays.sparse(hcat(patterns...))
