@@ -156,49 +156,6 @@ end
 # P = length(patterns[1])
 SparseArrays.sparse(hcat(patterns...))
 
-C_p = 0.5
-C_t = [types[i].cost for i in 1:length(types)]
-L_t = [types[i].length for i in 1:length(types)]
-S_f_t = [types[i].seatsFirst for i in 1:length(types)]
-S_s_t = [types[i].seatsSecond for i in 1:length(types)]
-I = length(arcs)
-T = 2
-P = length(alphas[1,:])
-P = 2
-init_paths = []
-push!(init_paths, alphas[:,1:5])
-push!(init_paths, alphas[:,1:5])
-P = length(init_paths[1][1,:])
-function MRP(init_paths)
-    P = length(init_paths[1][1,:])
-    model = Model(Gurobi.Optimizer)
-    set_silent(model)
-    @variable(model, y[1:P,1:T] >= 0)
-    # delta first class
-    @variable(model, delta_f[1:I] >= 0)
-    # delta second class
-    @variable(model, delta_s[1:I] >= 0)
-    # @variable(model, alpha[1:P, 1:I], Bin)
-    @objective(model, Min, sum(y*C_t) + (sum(delta_f) + sum(delta_s)) * C_p)
-    # max length constraint
-    @constraint(model, max_length[i=1:I], sum(L_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:2) <= arcs[i][6])
-    # passenger constraint
-    # first class
-    @constraint(model, first_class[i=1:I], sum(S_f_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:2) + delta_f[i] >= arcs[i][4])
-    # second class
-    @constraint(model, second_class[i=1:I], sum(S_s_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:2) + delta_s[i] >= arcs[i][5])
-    # number of trains at the start and end stations must be equal
-    @constraint(model, station[t=1:T, s=1:S], L_t[t] * sum(init_paths[t][i,p] * start_arcs[s][i] * y[p,t] for p = 1:P, i = 1:I) - L_t[t] * sum(init_paths[t][i,p] * stop_arcs[s][i] * y[p,t] for p = 1:P, i = 1:I) == 0)
-    # @constraint(model, y[1,1] == 1) something is wrong here, any value of y is out of bounds probably last constraint
-    optimize!(model)
-    println("Objective value: ", objective_value(model))
-    π = dual.(max_length)
-    λ_f = dual.(first_class)
-    λ_s = dual.(second_class)
-    μ = dual.(station)
-    return π, λ_f, λ_s, μ
-end
-fake_stations = [ "Amf", "Gn", "Gvc", "Lls", "Lw", "Rtd", "Shl", "Ut", "Zl", "s", "t"]
 function solve_pricing(π::Vector{Float64}, λ_f::Vector{Float64}, λ_s::Vector{Float64}, μ::Matrix{Float64})
     I = length(π)
     model = Model(Gurobi.Optimizer)
@@ -206,7 +163,10 @@ function solve_pricing(π::Vector{Float64}, λ_f::Vector{Float64}, λ_s::Vector{
     @variable(model, y[1:I,1:T], Bin)
     # arc capacity
     # @constraint(model, [i=1:I], sum(L_t[t] * sum(alphas[i,p] * y[p,t] for p = 1:P) for t in 1:2) <= arcs[i][6])
-    @objective(model, Max, sum(sum(C_t[t] * y[a,t] for t = 1:T, a=1:I) - sum((π[a] * L_t[t] + arcs[a][t+3] * λ_f[a] + arcs[a][t+4] * λ_s[a]) .* y[a,t] for t = 1:T, a=1:I) .- sum(((arcs[a][2][1] == "s" ? start_arcs[station_dict[arcs[a][3][1]]][a] * μ[t,station_dict[arcs[a][3][1]]] : 0)) * y[a,t] for a = 1:I, t=1:T) + sum(((arcs[a][3][1] == "t" ? stop_arcs[station_dict[arcs[a][2][1]]][a] * μ[t,station_dict[arcs[a][2][1]]] : 0)) * y[a,t] for a = 1:I, t=1:T)))
+    @objective(model, Min, sum(sum(C_t[1] * (sum(y[i,1] for i = 1:I) == 0 ? 0 : 1) + C_t[2] * (sum(y[i,2] for i = 1:I) == 0 ? 0 : 1))
+                        - sum((π[a] * L_t[t] + arcs[a][t+3] * λ_f[a] + arcs[a][t+4] * λ_s[a]) .* y[a,t] for t = 1:T, a=1:I) # TODO
+                        - sum(((arcs[a][2][1] == "s" ? start_arcs[station_dict[arcs[a][3][1]]][a] * μ[t,station_dict[arcs[a][3][1]]] : 0)) * y[a,t] for a = 1:I, t=1:T)
+                        + sum(((arcs[a][3][1] == "t" ? stop_arcs[station_dict[arcs[a][2][1]]][a] * μ[t,station_dict[arcs[a][2][1]]] : 0)) * y[a,t] for a = 1:I, t=1:T)))
     # artificial arcs from s must sum to 1
     @constraint(model, [t=1:T], sum(y[a,t]*start_arcs[s][a] for a = 1:I, s=1:S) == 1)
     # artificial arcs to t must sum to 1
@@ -229,18 +189,76 @@ function solve_pricing(π::Vector{Float64}, λ_f::Vector{Float64}, λ_s::Vector{
     end
     # @constraint(model, y[1,1] == y[2,1])
     optimize!(model)
-    if objective_value(model) > 1
+    if objective_value(model) < 0
         return round.(Int, value.(y))
     end
     return nothing
     println("test")
 end
+
+C_p = 0.5
+C_t = [types[i].cost for i in 1:length(types)]
+L_t = [types[i].length for i in 1:length(types)]
+S_f_t = [types[i].seatsFirst for i in 1:length(types)]
+S_s_t = [types[i].seatsSecond for i in 1:length(types)]
+I = length(arcs)
+T = 2
+P = length(alphas[1,:])
+P = 2
+init_paths = []
+push!(init_paths, alphas[:,1:25])
+push!(init_paths, alphas[:,1:25])
+push!(init_paths, alphas)
+push!(init_paths, alphas)
+push!(init_paths, zeros(Int, I))
+push!(init_paths, zeros(Int, I))
+
+P = length(init_paths[1][1,:])
+while true
+    P = length(init_paths[1][1,:])
+    model = Model(Gurobi.Optimizer)
+    set_silent(model)
+    @variable(model, y[1:P,1:T] >= 0)
+    # delta first class
+    @variable(model, delta_f[1:I] >= 0)
+    # delta second class
+    @variable(model, delta_s[1:I] >= 0)
+    # @variable(model, alpha[1:P, 1:I], Bin)
+    @objective(model, Min, sum(y*C_t) + (sum(delta_f) + sum(delta_s)) * C_p)
+    # max length constraint
+    @constraint(model, max_length[i=1:I], sum(L_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:T) <= arcs[i][6])
+    # passenger constraint
+    # first class
+    @constraint(model, first_class[i=1:I], sum(S_f_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:T) + delta_f[i] >= arcs[i][4])
+    # second class
+    @constraint(model, second_class[i=1:I], sum(S_s_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:T) + delta_s[i] >= arcs[i][5])
+    # number of trains at the start and end stations must be equal
+    @constraint(model, station[t=1:T, s=1:S], sum(init_paths[t][i,p] * y[p,t] .* start_arcs[s][i]  for p = 1:P, i = 1:I) - sum(init_paths[t][i,p] * y[p,t] * stop_arcs[s][i]  for p = 1:P, i = 1:I) == 0)
+
+    optimize!(model)
+    println("Objective value: ", objective_value(model))
+    π = dual.(max_length)
+    λ_f = dual.(first_class)
+    λ_s = dual.(second_class)
+    μ = dual.(station)
+    new_pattern = solve_pricing(π, λ_f, λ_s, μ)
+    if isnothing(new_pattern)
+        println("No improvements found, best objective value is: ", objective_value(model))
+        break
+    end
+    println("Current length of patterns: ", P)
+    init_paths[1] = hcat(init_paths[1], new_pattern[:,1])
+    init_paths[2] = hcat(init_paths[2], new_pattern[:,2])
+end
+fake_stations = [ "Amf", "Gn", "Gvc", "Lls", "Lw", "Rtd", "Shl", "Ut", "Zl", "s", "t"]
+
 # π, λ_f, λ_s, μ = MRP(init_paths)
 # print(sum(π))
 new_pattern = solve_pricing(π, λ_f, λ_s, μ)
 
 init_paths[1] = hcat(init_paths[1], new_pattern[:,1])
 init_paths[2] = hcat(init_paths[2], new_pattern[:,2])
+P = length(init_paths[1][1,:])
 # I don't know how to get this to work from the template 
 # push!(y, @variable(model, lower_bound = 0))
 # we need to add 2 variables the the decision variable y
