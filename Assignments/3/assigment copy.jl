@@ -234,6 +234,8 @@ while true
     @constraint(model, second_class[i=1:I], sum(S_s_t[t] * sum(init_paths[t][i,p] * y[p,t] for p = 1:P) for t in 1:T) + delta_s[i] >= arcs[i][5])
     # number of trains at the start and end stations must be equal
     @constraint(model, station[t=1:T, s=1:S], sum(init_paths[t][i,p] * y[p,t] .* start_arcs[s][i]  for p = 1:P, i = 1:I) - sum(init_paths[t][i,p] * y[p,t] * stop_arcs[s][i]  for p = 1:P, i = 1:I) == 0)
+    Ut = 8
+    @constraint(model, sum(init_paths[t][i,p] * y[p,t] .* stop_arcs[Ut][i] for p = 1:P, t = 1:T, i=1:I) <= 2)
 
     optimize!(model)
     println("Objective value: ", objective_value(model))
@@ -242,15 +244,16 @@ while true
     λ_s = dual.(second_class)
     μ = dual.(station)
     new_pattern = solve_pricing(π, λ_f, λ_s, μ)
-    if isnothing(new_pattern)
-        println("No improvements found, best objective value is: ", objective_value(model))
-        break
-    end
+    # if isnothing(new_pattern) || P == 50
+    #     println("No improvements found, best objective value is: ", objective_value(model))
+    #     break
+    # end
     println("Current length of patterns: ", P)
     init_paths[1] = hcat(init_paths[1], new_pattern[:,1])
     init_paths[2] = hcat(init_paths[2], new_pattern[:,2])
 end
-fake_stations = [ "Amf", "Gn", "Gvc", "Lls", "Lw", "Rtd", "Shl", "Ut", "Zl", "s", "t"]
+print(init_paths[1][:,end] .* arc_train_numbers)
+print(init_paths[2][:,end] .* arc_train_numbers)
 
 # π, λ_f, λ_s, μ = MRP(init_paths)
 # print(sum(π))
@@ -391,32 +394,38 @@ for station in stations
 end
 
 
-
-# model 
-# using JuMP, Gurobi
-# C_t = [types[i].cost for i in 1:length(types)] # cost of train type t
-# C_p = 0.5 # cost per first or second class passenger without a seat
-# # alpha is 1 if path p contains arc a otherwise 0
-# model = Model(Gurobi.Optimizer)
-
-# # variables I am not exactly sure if the y variable is correct
-# @variable(model, y[1:Graphs.ne(g), 1:length(types)], Bin)
-
-# # missing demand for first class
-# @variable(model, d_f[1:Graphs.nv(g), 1:Graphs.nv(g)] >= 0)
-
-# # missing demand for second class
-# @variable(model, d_s[1:Graphs.nv(g), 1:Graphs.nv(g)] >= 0)
-
-
-
-# # objective
-# @objective(model, Min, sum(C_t[t] * sum(y[p, t] for p in 1:Graphs.ne(g)) for t in 1:length(types))
-#                     + sum(C_p * (d_f[i, j] + d_s[i, j]) for i in 1:Graphs.nv(g), j in 1:Graphs.nv(g)))
-
-
+unique_nodes = []
 for arc in arcs
-    if arc[2][1] == stations[6] && arc[3][1] == "t"
-        println(arc)
+    push!(unique_nodes, arc[2])
+    push!(unique_nodes, arc[3])
+end
+unique_nodes = unique(unique_nodes)
+node_dict = Dict{Tuple{String, Time}, Int64}()
+for (i, node) in enumerate(unique_nodes)
+    node_dict[node] = i
+end
+sort!(unique_nodes, by=x -> (x[2]))
+g = Graphs.SimpleGraph(length(unique_nodes))
+for arc in arcs
+    from = node_dict[arc[2]]
+    to = node_dict[arc[3]]
+    Graphs.add_edge!(g, from, to)
+end
+
+node_colors = [colorant"#32cd32" for i in 1:GraphPlot.nv(g)]
+node_colors[node_dict[("t", Time(0,00))]] = colorant"Red"
+node_colors[node_dict[("s", Time(0,00))]] = colorant"Red"
+
+nlist = Vector{Vector{Int}}(undef, S+1) # two shells
+for i in 1:S+1
+    nlist[i] = []
+end
+nlist[end] = [node_dict[("t", Time(0,00))], node_dict[("s", Time(0,00))]]
+for (i, node) in enumerate(unique_nodes)
+    if i >2
+        push!(nlist[station_dict[node[1]]], i)
     end
 end
+reverse!(nlist)
+locs_x, locs_y = GraphPlot.shell_layout(g, nlist)
+GraphPlot.gplot(g, locs_x, locs_y, nodefillc=node_colors, edgestrokec=colorant"black")

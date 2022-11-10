@@ -1,6 +1,8 @@
 import Graphs
 import GraphPlot
 using NamedColors
+using Compose
+import Cairo
 include("dataReader.jl")
 
 trains = readTrainsFromCSV("trains.csv")
@@ -113,8 +115,9 @@ for (i, node) in enumerate(unique_nodes)
     push!(nlist[station_dict[node[1]]+1], i)
 end
 reverse!(nlist)
-# locs_x, locs_y = GraphPlot.shell_layout(g, nlist)
-# GraphPlot.gplot(g, locs_x, locs_y, nodefillc=node_colors)
+locs_x, locs_y = GraphPlot.shell_layout(g, nlist)
+GraphPlot.gplot(g, locs_x, locs_y, nodefillc=node_colors, edgestrokec=colorant"black")
+draw(PNG("time-space.png", 18cm, 16cm), GraphPlot.gplot(g, locs_x, locs_y, nodefillc=node_colors, edgestrokec=colorant"black"))
 # # print number of nodes and edges
 # println("Number of nodes: ", Graphs.nv(g))
 # println("Number of edges: ", Graphs.ne(g))
